@@ -28,6 +28,7 @@ class Coast{
  constructor(canvas){
   this.r=new T.WebGLRenderer({canvas,antialias:true});
   this.r.setPixelRatio(Math.min(devicePixelRatio,1.5));this.r.outputEncoding=T.sRGBEncoding;
+  this.r.toneMapping=T.ACESFilmicToneMapping;this.r.toneMappingExposure=1.02;
   this.scene=new T.Scene();this.scene.background=new T.Color(0x48ccf7);this.scene.fog=new T.FogExp2(0x8de5fa,.006);
   this.camera=new T.PerspectiveCamera(59,1,.1,480);
   this.scene.add(new T.HemisphereLight(0xfff6dd,0x5480a3,1.2));
@@ -43,11 +44,35 @@ class Coast{
   }
   land.setAttribute('color',new T.Float32BufferAttribute(colors,3));land.computeVertexNormals();
   this.scene.add(new T.Mesh(land,new T.MeshStandardMaterial({vertexColors:true,roughness:1})));
+  this.coastFoam=[];
+  for(let i=0;i<48;i++){
+   const z=26-i*2.55;
+   const foam=this.box(.23,.026,1.6+Math.sin(i)*.46,0xe9ffff,-35.8,-.128,z);
+   this.coastFoam.push(foam);
+  }
+  for(let i=0;i<11;i++){
+   const x=-55-i*12,z=-112-i%4*11;
+   this.ball(8+i%4*4,2.1+i%3,8,0x319b8f,x,-.14,z);
+  }
+  for(let i=0;i<9;i++){
+   const cloud=this.group();cloud.position.set(-92+i*24,21+i%3*4,-128-i%2*26);
+   for(let j=0;j<4;j++){
+    const puff=new T.Mesh(new T.IcosahedronGeometry(1,2),this.material(0xfffcf3));
+    puff.scale.set(5+j*.9,2.2+j*.4,3.6);puff.position.set(j*3.8,Math.sin(j*2)*1.1,0);cloud.add(puff);
+   }
+  }
   this.waves=[];
   for(let i=0;i<55;i++)this.waves.push(this.box(.13,.014,2+i%5,0xb4faff,-36-(i%10)*2.5,-.12,Math.sin(i*7)*82-33));
   for(let i=0;i<46;i++){
-   const x=8+Math.sin(i*7)*2.7,z=26-i*2.65;
-   this.box(3.4,.035,2.67,0xf5c27b,x,terrain(x,z)+.03,z);
+   const x=8+Math.sin(i*.24)*2.7,z=26-i*2.65;
+   const y=terrain(x,z);
+   this.box(4.2,.05,2.70,0xe6ba82,x,y+.03,z);
+   for(const edge of [-1,1])this.box(.08,.045,2.55,0xffdf9b,x+edge*2.05,y+.074,z);
+   if(i%2===0)this.box(.12,.035,.82,0xffeed1,x,y+.08,z);
+   if(i%5===0){
+    this.box(.11,1.15,.11,0x815136,x-2.7,y+.57,z);
+    this.box(.44,.18,.14,0xfff0b9,x-2.7,y+1.09,z);
+   }
   }
   for(let i=0;i<18;i++){
    const x=37+(i%3)*6,z=-15-Math.floor(i/3)*9;
@@ -67,16 +92,39 @@ class Coast{
    this.box(.12,3,.12,0xfff1d7,x,y+1.5,z);this.box(.77,.49,.04,[0xff586e,0xffe248,0x2ddbd2][i%3],x+.38,y+2.7,z);
   }
   this.car=this.group();
+  this.box(1.22,.12,1.86,0x275272,0,.29,0,this.car);
+  this.box(.84,.20,.73,0xfe7841,0,.52,-.54,this.car);
+  this.box(.49,.12,.13,0xffec9f,0,.53,-.94,this.car);
+  this.box(.50,.35,.34,0x294e67,0,.62,.36,this.car);
+  this.box(.38,.22,.26,0xf3b659,0,.58,.82,this.car);
+  this.box(.31,.07,.28,0xffecb5,0,.69,.82,this.car);
+  this.box(.32,.12,.095,0x274962,0,.81,-.21,this.car);
+  for(const x of [-.42,.42]){
+   this.box(.095,.12,1.58,0xffd175,x,.54,0,this.car);
+   this.box(.12,.36,.14,0xd99a75,x*.66,.86,.05,this.car).rotation.x=-.92;
+  }
   this.box(1.15,.24,1.75,0xff6457,0,.40,0,this.car);
   this.wheels=[];
   for(const x of [-.63,.63])for(const z of [-.63,.63]){
    const wheel=this.group(this.car);wheel.position.set(x,.28,z);
    const disk=new T.Mesh(new T.CylinderGeometry(.28,.28,.18,14),this.material(0x204563));
-   disk.rotation.z=Math.PI/2;wheel.add(disk);this.wheels.push(wheel);
+   disk.rotation.z=Math.PI/2;wheel.add(disk);
+   const hub=new T.Mesh(new T.CylinderGeometry(.15,.15,.035,12),this.material(0xffcf56));
+   hub.rotation.z=Math.PI/2;hub.position.x=Math.sign(x)*.099;wheel.add(hub);
+   for(let i=0;i<8;i++){
+    const angle=i*Math.PI/4;
+    const tread=this.box(.19,.05,.04,0x16394d,0,.273*Math.cos(angle),.273*Math.sin(angle),wheel);
+    tread.rotation.x=angle;
+   }
+   this.wheels.push(wheel);
   }
   this.box(.075,2.2,.075,0xfff5d9,.12,1.55,-.49,this.car);
   const sail=new T.Shape();sail.moveTo(0,0);sail.lineTo(0,1.65);sail.lineTo(1.03,0);sail.closePath();
   this.sail=new T.Mesh(new T.ShapeGeometry(sail),new T.MeshStandardMaterial({color:0xffd835,side:T.DoubleSide}));
+  const stripe=new T.Shape();
+  stripe.moveTo(0,.18);stripe.lineTo(0,.39);stripe.lineTo(.77,.39);stripe.lineTo(.90,.18);stripe.closePath();
+  const trim=new T.Mesh(new T.ShapeGeometry(stripe),new T.MeshStandardMaterial({color:0xff704d,side:T.DoubleSide,polygonOffset:true,polygonOffsetFactor:-1}));
+  this.sail.add(trim);
   this.sail.position.set(.12,.92,-.49);this.car.add(this.sail);
   this.box(.51,.53,.38,0x377ac4,0,.86,.29,this.car);
   this.box(.34,.36,.34,0xd99a75,0,1.29,.27,this.car);
@@ -125,7 +173,24 @@ class Coast{
  house(x,z,i){
   const g=this.group();g.position.set(x,terrain(x,z),z);
   this.box(3.8,2.4,3.7,[0xffdf9b,0xff8277,0x76e1cf][i%3],0,1.2,0,g);
-  const roof=this.box(3.1,3.1,4.1,0xf25947,0,2.44,0,g);roof.rotation.z=Math.PI/4;roof.scale.y=1.38;
+  const roofColor=[0xc9504d,0x337d9a,0xdb8046][i%3];
+  for(const side of [-1,1]){
+   const eave=this.box(2.45,.15,4.23,roofColor,side*1.07,2.88,0,g);
+   eave.rotation.z=-side*.44;
+   for(let tile=0;tile<8;tile++){
+    const ridge=this.box(2.43,.055,.045,0xf5a07b,side*1.07,2.98,(tile-3.5)*.49,g);
+    ridge.rotation.z=-side*.44;
+   }
+  }
+  this.box(4.05,.13,3.92,0xffedbb,0,2.37,0,g);
+  this.box(.46,.89,.48,0xf5bd8c,-.74,3.47,-.8,g);
+  this.box(.55,.11,.57,0xffe5b1,-.74,3.97,-.8,g);
+  this.box(1.02,.14,.50,0xe8be83,0,.10,2.03,g);
+  for(const x of [-1,1]){
+   this.box(.76,.70,.052,0xfff0c8,x,1.49,1.861,g);
+   this.box(.69,.12,.20,0xd46144,x,1.13,1.97,g);
+   this.box(.058,.50,.054,0xfff6df,x,1.49,1.933,g);
+  }
   this.box(.58,1.03,.07,0x3479a6,0,.52,1.88,g);
   for(const dx of [-1,1])this.box(.58,.53,.07,0xbff5f5,dx,1.49,1.88,g);
   return g;
@@ -161,6 +226,10 @@ class Coast{
   if(this.parade.visible){
    const [a,b]=event.position;this.parade.position.set(a-2+story*.8,terrain(a,b)+Math.abs(Math.sin(story*9))*.21,b);
   }
+  this.coastFoam.forEach((mesh,i)=>{
+   const pulse=Math.sin(t*1.45+i*.16);
+   mesh.position.x=-35.8+pulse*.39;mesh.scale.x=.12+.19*(pulse+1);
+  });
   this.waves.forEach((m,i)=>{m.position.y=-.12+Math.sin(t*2+i)*.008});
   if(menu||intro){
    this.camera.position.set(7-story*.75,5.2,10-story*.9);
@@ -169,10 +238,10 @@ class Coast{
    const [a,b]=event.position;this.camera.position.set(a+8*Math.cos(story*.47),terrain(a,b)+6,b+9);
    this.camera.lookAt(a,terrain(a,b)+(event.index===1?1.4:3),b);
   }else{
-   this.camTarget.set(x-Math.sin(car.heading)*6.5,y+3.9,z+Math.cos(car.heading)*6.5);
+   this.camTarget.set(x-Math.sin(car.heading)*6.5,y+3.05,z+Math.cos(car.heading)*6.5);
    if(this.previous!=='ride')this.camera.position.copy(this.camTarget);
    else this.camera.position.lerp(this.camTarget,1-Math.exp(-dt*6));
-   this.look.set(x+Math.sin(car.heading)*8,y+1.7,z-Math.cos(car.heading)*8);
+   this.look.set(x+Math.sin(car.heading)*8,y+2.15,z-Math.cos(car.heading)*8);
    this.camera.lookAt(this.look);
   }
   this.previous=phase;this.r.render(this.scene,this.camera);
